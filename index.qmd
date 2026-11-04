@@ -1,7 +1,40 @@
 ---
-title: "still at home"
+title: "Still at Home"
+execute:
+  echo: false
 ---
 
-This is a Quarto website.
+```{r}
+#| label: setup
+#| message: false
 
-To learn more about Quarto websites visit <https://quarto.org/docs/websites>.
+library(tidyverse)
+
+# Read in downloaded Census data
+sarasota <- read_rds("sarasota.rds")
+
+# Filter for 18-34 year olds and calculate the percentage living at home
+young_adults <- sarasota |>
+  filter(variable %in% c("B09021_008", "B09021_012")) |>
+  select(GEOID, NAME, variable, estimate) |>
+  pivot_wider(names_from = variable, values_from = estimate) |>
+  rename(total_18_34 = B09021_008, living_at_home = B09021_012) |>
+  mutate(pct_at_home = 100 * (living_at_home / total_18_34))
+```
+
+```{r}
+#| label: plot
+#| warning: false
+
+young_adults |>
+  ggplot(aes(x = pct_at_home)) +
+  geom_histogram(binwidth = 5, color = "white", fill = "steelblue") +
+  labs(
+    title = "Young Adults (18–34) Living at Home in Sarasota County",
+    subtitle = "Census tract percentages from the 2018–2022 ACS",
+    x = "Percentage living with parents (%)",
+    y = "Number of tracts",
+    caption = "Source: US Census Bureau"
+  ) +
+  theme_minimal()
+```
