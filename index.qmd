@@ -20,6 +20,9 @@ young_adults <- sarasota |>
   pivot_wider(names_from = variable, values_from = estimate) |>
   rename(total_18_34 = B09021_008, living_at_home = B09021_012) |>
   mutate(pct_at_home = 100 * (living_at_home / total_18_34))
+
+# Calculate the median percentage across tracts
+median_val <- median(young_adults$pct_at_home, na.rm = TRUE)
 ```
 
 ```{r}
@@ -28,13 +31,19 @@ young_adults <- sarasota |>
 
 young_adults |>
   ggplot(aes(x = pct_at_home)) +
-  geom_histogram(binwidth = 5, color = "white", fill = "steelblue") +
+  geom_histogram(binwidth = 5, color = "white", fill = "#1d3557") +
+  geom_vline(
+    xintercept = median_val,
+    linetype = "dashed",
+    color = "#e63946",
+    linewidth = 1
+  ) +
   labs(
     title = "Young Adults (18–34) Living at Home in Sarasota County",
-    subtitle = "Census tract percentages from the 2018–2022 ACS",
+    subtitle = paste0("Red dashed line indicates county median (", round(median_val, 1), "%)"),
     x = "Percentage living with parents (%)",
     y = "Number of tracts",
-    caption = "Source: US Census Bureau"
+    caption = "Source: US Census Bureau 2018–2022 ACS"
   ) +
-  theme_minimal()
+  theme_classic()
 ```
