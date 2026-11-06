@@ -2,7 +2,7 @@ project:
   type: website
 
 website:
-  title: "still at home"
+  title: "Still at Home"
   navbar:
     left:
       - href: index.qmd
@@ -11,11 +11,10 @@ website:
 
 format:
   html:
-    theme:
-      - cosmo
-      - brand
+    theme: cosmo
     css: styles.css
     toc: true
+    toc-depth: 2
 
 
 

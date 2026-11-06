@@ -1,5 +1,6 @@
 ---
 title: "Still at Home"
+subtitle: "Living Arrangements of Young Adults (18–34) Across Florida"
 execute:
   echo: false
 ---
@@ -10,34 +11,19 @@ execute:
 
 library(tidyverse)
 library(sf)
+library(leaflet)
 
 # Read in downloaded Census data and tract boundaries
 sarasota <- read_rds("sarasota.rds")
 tracts <- read_rds("tracts.rds")
 
-# 1. Total living with parents across Sarasota by age group
-living_by_age <- sarasota |>
-  filter(variable %in% c("B09021_012", "B09021_019", "B09021_026")) |>
-  mutate(
-    age_group = case_when(
-      variable == "B09021_012" ~ "18–34",
-      variable == "B09021_019" ~ "35–64",
-      variable == "B09021_026" ~ "65+"
-    )
-  ) |>
-  group_by(age_group) |>
-  summarize(total = sum(estimate, na.rm = TRUE))
-
-# 2. Number and percentage of 18-34 year olds living at home by tract
+# 1. Number and percentage of 18-34 year olds living at home by tract
 young_adults <- sarasota |>
   filter(variable %in% c("B09021_008", "B09021_012")) |>
   select(GEOID, NAME, variable, estimate) |>
   pivot_wider(names_from = variable, values_from = estimate) |>
   rename(total_18_34 = B09021_008, living_at_home = B09021_012) |>
   mutate(pct_at_home = 100 * (living_at_home / total_18_34))
-
-# Calculate median number across tracts
-median_count <- median(young_adults$living_at_home, na.rm = TRUE)
 
 # 3. Volusia County data and tract boundaries
 volusia <- read_rds("volusia.rds")
@@ -85,52 +71,40 @@ county_comparison <- bind_rows(
     )
 ) |>
   mutate(pct_at_home = 100 * (living_at_home / total_18_34))
+
+# 6. Nationwide state-level data and boundaries
+states_data <- read_rds("states_data.rds")
+states_geo <- read_rds("states_geo.rds")
+
+states_young_adults <- states_data |>
+  filter(variable %in% c("B09021_008", "B09021_012")) |>
+  select(GEOID, NAME, variable, estimate) |>
+  pivot_wider(names_from = variable, values_from = estimate) |>
+  rename(total_18_34 = B09021_008, living_at_home = B09021_012) |>
+  mutate(pct_at_home = round(100 * (living_at_home / total_18_34), 1))
+
+states_map_sf <- states_geo |>
+  left_join(states_young_adults, by = "GEOID")
 ```
 
-```{r}
-#| label: plot-age-brackets
-#| warning: false
+Where do young adults in Florida live with their parents? Using data from the US Census Bureau's 2018–2022 American Community Survey (ACS), we map tract-level geographic patterns across Sarasota and Volusia Counties, zoom out to Central Florida, and compare regional drivers.
 
-living_by_age |>
-  ggplot(aes(x = age_group, y = total)) +
-  geom_col(fill = "#1d3557") +
-  scale_y_continuous(labels = scales::comma) +
-  labs(
-    title = "Adults Living with Parents by Age Group",
-    subtitle = "Sarasota County, Florida",
-    x = "Age group",
-    y = "Number of people living with parents",
-    caption = "Source: US Census Bureau 2018–2022 ACS"
-  ) +
-  theme_classic()
-```
+::: {.panel-tabset}
 
-```{r}
-#| label: plot-tract-counts
-#| warning: false
+## Florida Counties
 
-young_adults |>
-  ggplot(aes(x = living_at_home)) +
-  geom_histogram(binwidth = 50, color = "white", fill = "#1d3557") +
-  geom_vline(
-    xintercept = median_count,
-    linetype = "dashed",
-    color = "#e63946",
-    linewidth = 1
-  ) +
-  labs(
-    title = "Distribution of 18–34 Year Olds Living with Parents",
-    subtitle = paste0("Red dashed line indicates county median per tract (", round(median_count), " people)"),
-    x = "Number of young adults (18–34) living with parents per tract",
-    y = "Number of tracts",
-    caption = "Source: US Census Bureau 2018–2022 ACS"
-  ) +
-  theme_classic()
-```
+::: {.panel-tabset}
+
+### Sarasota County
+
+Sarasota County exhibits notable geographic variation: inland and southern tracts around North Port show higher proportions of young adults living with parents compared to coastal and downtown neighborhoods.
 
 ```{r}
 #| label: plot-map
 #| warning: false
+#| fig-width: 8
+#| fig-height: 6
+#| fig-align: center
 
 # Coordinates for major Sarasota County cities to provide geographic context
 major_cities <- tibble(
@@ -167,9 +141,16 @@ tracts |>
   theme_void()
 ```
 
+### Volusia County
+
+In Volusia County, young adults living with parents are particularly concentrated in suburban inland communities like Deltona, contrasted with coastal tracts near Daytona Beach and New Smyrna Beach.
+
 ```{r}
 #| label: plot-volusia-map
 #| warning: false
+#| fig-width: 8
+#| fig-height: 6
+#| fig-align: center
 
 # Coordinates for major Volusia County cities
 volusia_cities <- tibble(
@@ -206,9 +187,16 @@ volusia_tracts |>
   theme_void()
 ```
 
+### Central Florida Region
+
+Zooming out to seven counties across Central Florida (Orange, Seminole, Osceola, Lake, Brevard, Volusia, and Polk) highlights a regional divide: rates are highest across southern inland tracts, while central Orlando tracts feature lower shares.
+
 ```{r}
 #| label: plot-central-florida-map
 #| warning: false
+#| fig-width: 9
+#| fig-height: 7
+#| fig-align: center
 
 # Coordinates for major Central Florida anchor cities
 cf_cities <- tibble(
@@ -246,11 +234,14 @@ cf_tracts |>
   theme_void()
 ```
 
-## Comparing Sarasota, Volusia, and Orange Counties
+### County Comparison
 
 ```{r}
 #| label: plot-county-comparison
 #| warning: false
+#| fig-width: 7
+#| fig-height: 4.5
+#| fig-align: center
 
 county_comparison |>
   ggplot(aes(x = fct_reorder(county, pct_at_home, .desc = TRUE), y = pct_at_home)) +
@@ -283,12 +274,60 @@ Several key factors likely drive these differences:
 - **Housing Costs & Retiree-Heavy Demographics:** Sarasota is an affluent coastal county with a high median age and steep housing and rental prices. For young adults entering the local workforce, high cost of living makes independent renting significantly more challenging.
 - **Urban Density vs. Suburban/Coastal Communities:** Orange County's dense urban core provides a broader inventory of multi-family apartments and starter rental units compared to the single-family and retirement-oriented neighborhoods common in Sarasota and Volusia.
 
-## Why Does Osceola County Have the Highest Rate in the Region?
+### Osceola County
 
 Across all of Central Florida, **Osceola County** stands out with nearly half (**47.9%**) of young adults living with parents—the highest rate in the region. 
 
-Why is Osceola so high?
-
+::: {.callout-note}
+#### Key Factors Behind Osceola's High Rate
 1. **Multigenerational Family Norms:** Osceola County has a majority Hispanic population (56.1%). In Hispanic cultures, multigenerational living and young adults remaining in the family home until marriage or financial stability is culturally valued and common.
 2. **Tourism & Service-Sector Wages:** Much of Osceola's economy is tied to the hospitality and service industries supporting the Kissimmee and Walt Disney World corridor. Because these positions often pay entry-level wages while regional rent prices have surged, young workers are often financially priced out of independent living.
 3. **Absence of a Large Residential University Influx:** Unlike Orange County, Osceola does not have a massive residential university drawing tens of thousands of independent young adult renters from outside the area.
+:::
+
+:::
+
+## United States
+
+How do Florida's rates compare across the rest of the United States? The interactive map below shows the percentage of young adults (18–34) living with their parents in each state. Hover over or tap any state to view its exact percentage.
+
+```{r}
+#| label: plot-interactive-states-map
+#| warning: false
+
+# Color palette matching the project plasma theme
+pal <- colorNumeric("plasma", domain = states_map_sf$pct_at_home)
+
+leaflet(states_map_sf, height = 500, width = "100%") |>
+  addProviderTiles(providers$CartoDB.Positron) |>
+  setView(lng = -96, lat = 37.8, zoom = 4) |>
+  addPolygons(
+    fillColor = ~pal(pct_at_home),
+    weight = 1,
+    opacity = 1,
+    color = "white",
+    dashArray = "3",
+    fillOpacity = 0.75,
+    highlightOptions = highlightOptions(
+      weight = 2,
+      color = "#333",
+      fillOpacity = 0.9,
+      bringToFront = TRUE
+    ),
+    label = ~paste0(NAME.x, ": ", pct_at_home, "% living with parents"),
+    labelOptions = labelOptions(
+      style = list("font-weight" = "normal", padding = "3px 8px"),
+      textsize = "13px",
+      direction = "auto"
+    )
+  ) |>
+  addLegend(
+    pal = pal,
+    values = ~pct_at_home,
+    opacity = 0.75,
+    title = "Living with<br>Parents (%)",
+    position = "bottomright"
+  )
+```
+
+:::

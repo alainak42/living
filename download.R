@@ -47,3 +47,16 @@ write_rds(cf_tracts, "central_florida_tracts.rds")
 cf_county_borders <- tigris::counties(state = "FL", cb = TRUE, year = 2022) |>
   filter(NAME %in% cf_counties_list)
 write_rds(cf_county_borders, "central_florida_counties.rds")
+
+# Nationwide state-level Census data and boundaries
+states_data <- get_acs(
+  geography = "state",
+  table = "B09021",
+  year = 2022
+)
+write_rds(states_data, "states_data.rds")
+
+states_geo <- tigris::states(cb = TRUE, year = 2022) |>
+  filter(!STATEFP %in% c("60", "66", "69", "72", "78")) |>
+  sf::st_transform(4326)
+write_rds(states_geo, "states_geo.rds")
